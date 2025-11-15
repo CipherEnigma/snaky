@@ -34,7 +34,7 @@ Modular structure allows multiple developers to work independently on:
 ---
 
 ## 📷 Screenshots
-_Add gameplay screenshots here._
+_Add gameplay screenshots._
 
 ---
 

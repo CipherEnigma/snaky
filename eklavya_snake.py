@@ -6,10 +6,10 @@ from typing import List, Tuple
 # Initialize Pygame
 pygame.init()
 
-# Game constants  
-N = 30  # Increased grid size
-BLOCK_SIZE = 20
-WINDOW_WIDTH  = N * BLOCK_SIZE
+# Game constants
+N = 30  # Grid size (increased from 30)
+BLOCK_SIZE = 25  # Block size (increased from 25)
+WINDOW_WIDTH = N * BLOCK_SIZE
 WINDOW_HEIGHT = N * BLOCK_SIZE
 TASKBAR_HEIGHT = 40
 
@@ -50,30 +50,30 @@ def show_instructions():
     """Display instructions before starting the game"""
     instruction_screen = True
     border_offset = 0
-    
+
     while instruction_screen:
         window.fill(BLACK)
-        
+
         # Draw colorful animated border
         border_width = 5
         for i, color in enumerate(BORDER_COLORS):
-            offset = (border_offset + i * 20) % (2 * (WINDOW_WIDTH + WINDOW_HEIGHT))
+            offset = (border_offset + i * 20) % (2 * (WINDOW_WIDTH + WINDOW_HEIGHT + TASKBAR_HEIGHT)) # Adjusted for full window height
             if offset < WINDOW_WIDTH:
                 pygame.draw.rect(window, color, [offset, 0, 20, border_width])
-            elif offset < WINDOW_WIDTH + WINDOW_HEIGHT:
+            elif offset < WINDOW_WIDTH + WINDOW_HEIGHT + TASKBAR_HEIGHT:
                 pygame.draw.rect(window, color, [WINDOW_WIDTH - border_width, offset - WINDOW_WIDTH, border_width, 20])
-            elif offset < 2 * WINDOW_WIDTH + WINDOW_HEIGHT:
-                pygame.draw.rect(window, color, [WINDOW_WIDTH - (offset - WINDOW_WIDTH - WINDOW_HEIGHT), WINDOW_HEIGHT + TASKBAR_HEIGHT - border_width, 20, border_width])
+            elif offset < 2 * WINDOW_WIDTH + WINDOW_HEIGHT + TASKBAR_HEIGHT:
+                pygame.draw.rect(window, color, [WINDOW_WIDTH - (offset - (WINDOW_WIDTH + WINDOW_HEIGHT + TASKBAR_HEIGHT)), WINDOW_HEIGHT + TASKBAR_HEIGHT - border_width, 20, border_width])
             else:
-                pygame.draw.rect(window, color, [0, WINDOW_HEIGHT + TASKBAR_HEIGHT - (offset - 2 * WINDOW_WIDTH - WINDOW_HEIGHT), border_width, 20])
-        
-        border_offset = (border_offset + 2) % (2 * (WINDOW_WIDTH + WINDOW_HEIGHT))
-        
+                pygame.draw.rect(window, color, [0, (WINDOW_HEIGHT + TASKBAR_HEIGHT) - (offset - (2 * WINDOW_WIDTH + WINDOW_HEIGHT + TASKBAR_HEIGHT)), border_width, 20])
+
+        border_offset = (border_offset + 2) % (2 * (WINDOW_WIDTH + WINDOW_HEIGHT + TASKBAR_HEIGHT))
+
         # Title
         title = title_font.render("AI Snake Game", True, (0, 255, 100))
         title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, 80))
         window.blit(title, title_rect)
-        
+
         # Instructions
         instructions = [
             "How to Play:",
@@ -92,7 +92,7 @@ def show_instructions():
             "",
             "Press SPACE to start!"
         ]
-        
+
         y_offset = 150
         for line in instructions:
             if line.startswith("•"):
@@ -103,13 +103,13 @@ def show_instructions():
                 text = font.render(line, True, (0, 255, 0))
             else:
                 text = font.render(line, True, GRAY if line == "" else WHITE)
-            
+
             text_rect = text.get_rect(center=(WINDOW_WIDTH // 2, y_offset))
             window.blit(text, text_rect)
             y_offset += 35
-        
+
         pygame.display.update()
-        
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -120,7 +120,7 @@ def show_instructions():
                 elif event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     quit()
-        
+
         clock.tick(30)
 
 
@@ -129,13 +129,17 @@ class SnakeGame:
         self.width = WINDOW_WIDTH
         self.height = WINDOW_HEIGHT
         self.block_size = BLOCK_SIZE
-        self.snake_speed = 10
+        self.snake_speed = 40 # Increased from 10
         self.high_score = 0
         self.border_offset = 0
         self.reset_game()
 
     def reset_game(self):
-        self.snake = [[self.width // 2, self.height // 2]]
+        # Start snake in a reasonable position in the larger grid
+        start_x = (self.width // (2 * self.block_size)) * self.block_size
+        start_y = (self.height // (2 * self.block_size)) * self.block_size
+        self.snake = [[start_x, start_y]]
+        
         self.direction = "RIGHT"
         self.score = 0
         self.generate_food()
@@ -155,6 +159,7 @@ class SnakeGame:
         x1, y1 = pos1
         x2, y2 = pos2
         
+        # Calculate wrapped distance
         dx1 = abs(x1 - x2)
         dx2 = self.width - dx1
         dx = min(dx1, dx2)
@@ -163,26 +168,29 @@ class SnakeGame:
         dy2 = self.height - dy1
         dy = min(dy1, dy2)
         
-        return dx + dy
+        # We return distance in terms of blocks, not pixels, for the heuristic
+        return (dx + dy) // self.block_size
 
     def wrap_position(self, pos: List[int]) -> List[int]:
         x, y = pos
         x = (x + self.width) % self.width
         y = (y + self.height) % self.height
+        # Ensure alignment to the grid (though it should be already)
         x = (x // self.block_size) * self.block_size
         y = (y // self.block_size) * self.block_size
         return [x, y]
 
     def get_neighbors(self, pos: List[int]) -> List[List[int]]:
         neighbors = []
-        moves = [(0, -self.block_size), (0, self.block_size), 
-                (-self.block_size, 0), (self.block_size, 0)]
+        moves = [(0, -self.block_size), (0, self.block_size),
+                 (-self.block_size, 0), (self.block_size, 0)]
         
         for dx, dy in moves:
             new_x = pos[0] + dx
             new_y = pos[1] + dy
             new_pos = self.wrap_position([new_x, new_y])
             
+            # Avoid collision with snake body
             if new_pos not in self.snake[1:]:
                 neighbors.append(new_pos)
         
@@ -192,7 +200,7 @@ class SnakeGame:
         start = tuple(self.snake[0])
         goal = tuple(self.food)
 
-        open_set = [(0, start)]
+        open_set = [(0, start)]  # (f_score, position)
         came_from = {}
         g_score = {start: 0}
         f_score = {start: self.manhattan_distance(self.snake[0], self.food)}
@@ -208,8 +216,10 @@ class SnakeGame:
                 path.reverse()
                 return path
 
-            for neighbor in map(tuple, self.get_neighbors(list(current))):
-                tentative_g_score = g_score[current] + self.block_size
+            for neighbor_list in self.get_neighbors(list(current)):
+                neighbor = tuple(neighbor_list)
+                # g_score is 1 block move, regardless of pixel size
+                tentative_g_score = g_score[current] + 1 
 
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
@@ -219,21 +229,22 @@ class SnakeGame:
                     )
                     heappush(open_set, (f_score[neighbor], neighbor))
 
-        return []
+        return []  # No path found
 
     def update_direction(self, next_pos: List[int]):
         head = self.snake[0]
         x1, y1 = head
         x2, y2 = next_pos
         
+        # Calculate wrapped delta
         dx1 = x2 - x1
-        dx2 = x2 - x1 + self.width
-        dx3 = x2 - x1 - self.width
+        dx2 = x2 - x1 + self.width  # wrap left
+        dx3 = x2 - x1 - self.width  # wrap right
         dx = min(dx1, dx2, dx3, key=abs)
         
         dy1 = y2 - y1
-        dy2 = y2 - y1 + self.height
-        dy3 = y2 - y1 - self.height
+        dy2 = y2 - y1 + self.height # wrap up
+        dy3 = y2 - y1 - self.height # wrap down
         dy = min(dy1, dy2, dy3, key=abs)
         
         if abs(dx) > abs(dy):
@@ -260,19 +271,20 @@ class SnakeGame:
             self.snake.insert(0, new_head)
             self.score += 1
             self.generate_food()
-            if self.score % 5 == 0:
-                self.snake_speed = min(30, self.snake_speed + 2)
+            if self.score % 3 == 0:
+                self.snake_speed = min(70, self.snake_speed + 5)
+            self.path = [] # Force recalculate path
         else:
             self.snake[0] = new_head
             for i in range(1, len(self.snake)):
-                self.snake[i] = prev_positions[i-1]
+                self.snake[i] = prev_positions[i - 1]
 
     def check_collision(self) -> bool:
         head = self.snake[0]
         return head in self.snake[1:]
 
     def draw_colorful_border(self):
-        """Draw animated rainbow border"""
+        """Draw animated rainbow border around the game area"""
         border_width = 8
         for i, color in enumerate(BORDER_COLORS):
             offset = (self.border_offset + i * 30) % (2 * (self.width + self.height))
@@ -280,13 +292,13 @@ class SnakeGame:
             if offset < self.width:
                 pygame.draw.rect(window, color, [offset, TASKBAR_HEIGHT, 25, border_width])
             elif offset < self.width + self.height:
-                y_pos = offset - self.width + TASKBAR_HEIGHT
+                y_pos = (offset - self.width) + TASKBAR_HEIGHT
                 pygame.draw.rect(window, color, [self.width - border_width, y_pos, border_width, 25])
             elif offset < 2 * self.width + self.height:
-                x_pos = self.width - (offset - self.width - self.height)
+                x_pos = self.width - (offset - (self.width + self.height))
                 pygame.draw.rect(window, color, [x_pos, self.height + TASKBAR_HEIGHT - border_width, 25, border_width])
             else:
-                y_pos = self.height + TASKBAR_HEIGHT - (offset - 2 * self.width - self.height)
+                y_pos = self.height + TASKBAR_HEIGHT - (offset - (2 * self.width + self.height))
                 pygame.draw.rect(window, color, [0, y_pos, border_width, 25])
         
         self.border_offset = (self.border_offset + 3) % (2 * (self.width + self.height))
@@ -295,9 +307,8 @@ class SnakeGame:
         """Draw the A* path from snake head to food"""
         if self.path:
             # Create a surface with transparency for the path
-            path_surface = pygame.Surface((self.block_size, self.block_size))
-            path_surface.set_alpha(128)  # Semi-transparent
-            path_surface.fill(PATH_COLOR[:3])
+            path_surface = pygame.Surface((self.block_size, self.block_size), pygame.SRCALPHA)
+            path_surface.fill(PATH_COLOR) # Use color with alpha
             
             for pos in self.path:
                 window.blit(path_surface, (pos[0], pos[1] + TASKBAR_HEIGHT))
@@ -307,21 +318,21 @@ class SnakeGame:
                 pygame.draw.circle(window, (150, 200, 255), (center_x, center_y), 3)
 
     def draw_snake(self):
+        snake_thickness = self.block_size + 8  # Make snake thicker (+8 pixels)
+        offset = -4  # Center the thicker block
+
         for idx, segment in enumerate(self.snake):
+            rect = pygame.Rect(
+                segment[0] + offset,
+                segment[1] + offset + TASKBAR_HEIGHT,
+                snake_thickness,
+                snake_thickness,
+            )
+
             if idx == 0:
-                pygame.draw.rect(
-                    window,
-                    SNAKE_HEAD_COLOR,
-                    [segment[0], segment[1] + TASKBAR_HEIGHT, self.block_size, self.block_size],
-                    border_radius=8,
-                )
+                pygame.draw.rect(window, SNAKE_HEAD_COLOR, rect, border_radius=10)
             else:
-                pygame.draw.rect(
-                    window,
-                    SNAKE_BODY_COLOR,
-                    [segment[0], segment[1] + TASKBAR_HEIGHT, self.block_size, self.block_size],
-                    border_radius=4,
-                )
+                pygame.draw.rect(window, SNAKE_BODY_COLOR, rect, border_radius=6)
 
     def display_game_over(self):
         window.fill(BLACK)
@@ -329,21 +340,21 @@ class SnakeGame:
         random_color = random.choice(RANDOM_COLORS)
 
         game_over_text = game_over_font.render(random_message, True, random_color)
-        game_over_rect = game_over_text.get_rect(center=(self.width // 2, self.height // 2 - 50))
+        game_over_rect = game_over_text.get_rect(center=(self.width // 2, (self.height + TASKBAR_HEIGHT) // 2 - 50))
         window.blit(game_over_text, game_over_rect)
 
         score_text = font.render(f"Your Score: {self.score}", True, WHITE)
-        score_rect = score_text.get_rect(center=(self.width // 2, self.height // 2 + 20))
+        score_rect = score_text.get_rect(center=(self.width // 2, (self.height + TASKBAR_HEIGHT) // 2 + 20))
         window.blit(score_text, score_rect)
 
         high_score_text = font.render(f"High Score: {self.high_score}", True, WHITE)
-        high_score_rect = high_score_text.get_rect(center=(self.width // 2, self.height // 2 + 60))
+        high_score_rect = high_score_text.get_rect(center=(self.width // 2, (self.height + TASKBAR_HEIGHT) // 2 + 60))
         window.blit(high_score_text, high_score_rect)
 
         play_again_text = font.render("Play Again (SPACE)", True, WHITE)
         quit_text = font.render("Quit (ESC)", True, WHITE)
-        play_again_rect = play_again_text.get_rect(center=(self.width // 2, self.height // 2 + 120))
-        quit_rect = quit_text.get_rect(center=(self.width // 2, self.height // 2 + 160))
+        play_again_rect = play_again_text.get_rect(center=(self.width // 2, (self.height + TASKBAR_HEIGHT) // 2 + 120))
+        quit_rect = quit_text.get_rect(center=(self.width // 2, (self.height + TASKBAR_HEIGHT) // 2 + 160))
 
         selected = 0
 
@@ -401,6 +412,10 @@ class SnakeGame:
             if self.path:
                 next_step = self.path.pop(0)
                 self.update_direction(next_step)
+            else:
+                # No path found (e.g., trapped), just keep moving forward
+                # This will likely lead to a game over, which is expected
+                pass
 
             self.move_snake()
 
@@ -424,10 +439,15 @@ class SnakeGame:
             # Draw snake
             self.draw_snake()
 
+            # Draw colorful border
+            # self.draw_colorful_border()
+
             # Draw taskbar
             pygame.draw.rect(window, GRAY, [0, 0, self.width, TASKBAR_HEIGHT])
-            score_text = font.render(f"Score: {self.score}  |  High Score: {self.high_score}  |  Speed: {self.snake_speed}", True, WHITE)
-            window.blit(score_text, [10, TASKBAR_HEIGHT // 2 - score_text.get_height() // 2])
+            score_text_str = f"Score: {self.score}   |   High Score: {self.high_score}"
+            score_text = font.render(score_text_str, True, WHITE)
+            score_rect = score_text.get_rect(center=(self.width // 2, TASKBAR_HEIGHT // 2))
+            window.blit(score_text, score_rect)
 
             pygame.display.update()
             clock.tick(self.snake_speed)

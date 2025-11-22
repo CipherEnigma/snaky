@@ -7,10 +7,12 @@ from typing import List, Tuple
 pygame.init()
 
 # Game constants  
-N = 20  # Default grid size (will be set by user input)
-BLOCK_SIZE = 20
-WINDOW_WIDTH  = N * BLOCK_SIZE
-WINDOW_HEIGHT = N * BLOCK_SIZE
+N = 35  # Default grid size 
+BLOCK_SIZE = 30
+FIXED_WINDOW_WIDTH = 900
+FIXED_WINDOW_HEIGHT = 900
+WINDOW_WIDTH  = FIXED_WINDOW_WIDTH
+WINDOW_HEIGHT = FIXED_WINDOW_HEIGHT
 TASKBAR_HEIGHT = 40
 
 # Colors
@@ -42,14 +44,14 @@ game_over_font = pygame.font.SysFont("arial", 50, bold=True)
 
 # Game-over messages
 WIN_MESSAGES = [
-    "You Win! 🎉",
+    "You Win!",
     "Victory is Yours!",
     "AI Defeated!",
     "Human Supremacy!",
 ]
 
 LOSE_MESSAGES = [
-    "AI Wins! 🤖",
+    "AI Wins!",
     "Better Luck Next Time!",
     "AI Outsmarted You!",
     "The Machines Rise!",
@@ -60,48 +62,6 @@ TIE_MESSAGES = [
     "Both Defeated!",
     "Draw Game!",
 ]
-
-
-def get_grid_size():
-    """Get grid size from user."""
-    input_value = ""
-    prompt_font = pygame.font.SysFont(None, 50)
-    
-    while True:
-        window.fill(BLACK)
-        
-        prompt = prompt_font.render("Enter Grid Size (N×N):", True, WHITE)
-        window.blit(prompt, (WINDOW_WIDTH // 2 - prompt.get_width() // 2, 150))
-        
-        hint = font.render("Recommended: 10-50", True, GRAY)
-        window.blit(hint, (WINDOW_WIDTH // 2 - hint.get_width() // 2, 210))
-        
-        user_text = prompt_font.render(input_value, True, (0, 255, 0))
-        window.blit(user_text, (WINDOW_WIDTH // 2 - user_text.get_width() // 2, 280))
-        
-        instruction = font.render("Press ENTER to continue", True, (150, 150, 150))
-        window.blit(instruction, (WINDOW_WIDTH // 2 - instruction.get_width() // 2, 380))
-        
-        pygame.display.update()
-        
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
-            
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    if input_value.isdigit() and 5 <= int(input_value) <= 100:
-                        return int(input_value)
-                elif event.key == pygame.K_BACKSPACE:
-                    input_value = input_value[:-1]
-                elif event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    quit()
-                else:
-                    if event.unicode.isdigit() and len(input_value) < 3:
-                        input_value += event.unicode
-
 
 def show_instructions():
     """Display instructions before starting the game"""
@@ -194,7 +154,7 @@ class SnakeGame:
         self.block_size = BLOCK_SIZE
         self.width = self.grid_size * self.block_size
         self.height = self.grid_size * self.block_size
-        self.snake_speed = 10
+        self.snake_speed = 6  # Changed from 10 to 6 for slower initial speed
         self.high_score = 0
         self.border_offset = 0
         self.reset_game()
@@ -365,9 +325,9 @@ class SnakeGame:
             else:
                 self.ai_score += 1
             self.generate_food()
-            # Speed up every 3 points
-            if (self.player_score + self.ai_score) % 3 == 0:
-                self.snake_speed = min(25, self.snake_speed + 1)
+            # Speed up every 5 points (changed from 3 for more gradual increase)
+            if (self.player_score + self.ai_score) % 5 == 0:
+                self.snake_speed = min(15, self.snake_speed + 1)  # Max speed reduced from 25 to 15
         else:
             snake[0] = new_head
             for i in range(1, len(snake)):
@@ -613,15 +573,15 @@ class SnakeGame:
 
 if __name__ == "__main__":
     # Get grid size first
-    grid_size = get_grid_size()
+    grid_size = N
+
+    # Show instructions in the fixed-size window
+    show_instructions()
     
     # Update window size based on grid
     WINDOW_WIDTH = grid_size * BLOCK_SIZE
     WINDOW_HEIGHT = grid_size * BLOCK_SIZE
     window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT + TASKBAR_HEIGHT))
-    
-    # Show instructions
-    show_instructions()
     
     # Start game with selected grid size
     game = SnakeGame(grid_size)
